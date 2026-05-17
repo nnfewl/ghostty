@@ -1,0 +1,446 @@
+name: Release Twemoji builds
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # hourly upstream check
+  workflow_dispatch: {}
+
+permissions:
+  contents: write   # gh release create/delete + tag push
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPO: ghostty-org/ghostty
+
+jobs:
+  # -----------------------------------------------------------------------
+  # detect-upstream
+  # -----------------------------------------------------------------------
+  detect-upstream:
+    runs-on: ubuntu-24.04
+    outputs:
+      main_sha:        ${{ steps.detect.outputs.main_sha }}
+      main_full_sha:   ${{ steps.detect.outputs.main_full_sha }}
+      stable_branch:   ${{ steps.detect.outputs.stable_branch }}
+      stable_sha:      ${{ steps.detect.outputs.stable_sha }}
+      stable_full_sha: ${{ steps.detect.outputs.stable_full_sha }}
+      stable_version:  ${{ steps.detect.outputs.stable_version }}
+      build_main:      ${{ steps.detect.outputs.build_main }}
+      build_stable:    ${{ steps.detect.outputs.build_stable }}
+      today:           ${{ steps.detect.outputs.today }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect upstream + existing releases
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/detect-upstream.sh
+      - name: Summary
+        run: |
+          echo "### Upstream state" >> "$GITHUB_STEP_SUMMARY"
+          echo "| | sha | needs build? |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| main | \`${{ steps.detect.outputs.main_sha }}\` | ${{ steps.detect.outputs.build_main }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| stable (\`${{ steps.detect.outputs.stable_branch }}\` @ v${{ steps.detect.outputs.stable_version }}) | \`${{ steps.detect.outputs.stable_sha }}\` | ${{ steps.detect.outputs.build_stable }} |" >> "$GITHUB_STEP_SUMMARY"
+
+  # -----------------------------------------------------------------------
+  # Reusable composite logic via job templates would be nicer here, but
+  # GitHub Actions doesn't support `uses:` for embedded jobs without
+  # creating separate workflow files. We accept the repetition.
+  #
+  # Each build job:
+  #   1. Checks out our fork (full clone, so it has twemoji-* branches).
+  #   2. Adds upstream as remote, fetches the channel's full SHA.
+  #   3. Creates a worktree (or sparse checkout) of upstream at that SHA.
+  #   4. Generates patches from the relevant dev branch and applies them.
+  #   5. Builds with Nix/Zig (Linux) or Nix/Zig + Xcode (macOS).
+  #   6. Uploads the artifact.
+  # -----------------------------------------------------------------------
+
+  # ===== Linux (CBDT Twemoji) =============================================
+  build-linux-main:
+    needs: detect-upstream
+    if: needs.detect-upstream.outputs.build_main == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout our fork
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch upstream main
+        run: |
+          git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
+          git fetch upstream main --depth=1
+      - name: Build workspace at upstream main + patches
+        env:
+          UPSTREAM_SHA: ${{ needs.detect-upstream.outputs.main_full_sha }}
+        run: |
+          # Create a worktree of upstream at the target SHA
+          git worktree add ../upstream "$UPSTREAM_SHA"
+          # Generate our patches against upstream main (where dev branch was based)
+          mkdir -p /tmp/patches
+          bash scripts/generate-patches.sh twemoji-emoji /tmp/patches
+          # Apply patches inside the worktree
+          cd ../upstream
+          git config user.email "twemoji-pipeline@local"
+          git config user.name  "twemoji-pipeline"
+          git am /tmp/patches/*.patch
+      - uses: DeterminateSystems/nix-installer-action@main
+        with: { determinate: true }
+      - name: Build Ghostty (Linux)
+        working-directory: ../upstream
+        run: nix develop -c zig build -Doptimize=ReleaseFast -p ./out
+      - name: Package artifact
+        working-directory: ../upstream
+        run: |
+          mkdir -p ../staging
+          cp out/bin/ghostty ../staging/
+          cd ../staging
+          tar czf ghostty-linux-x86_64.tar.gz ghostty
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-main
+          path: ../staging/ghostty-linux-x86_64.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  build-linux-stable:
+    needs: detect-upstream
+    if: needs.detect-upstream.outputs.build_stable == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Fetch upstream stable branch
+        env:
+          STABLE_BRANCH: ${{ needs.detect-upstream.outputs.stable_branch }}
+        run: |
+          git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
+          git fetch upstream "$STABLE_BRANCH" --depth=1
+      - name: Build workspace at upstream stable + patches
+        env:
+          UPSTREAM_SHA: ${{ needs.detect-upstream.outputs.stable_full_sha }}
+        run: |
+          git worktree add ../upstream "$UPSTREAM_SHA"
+          mkdir -p /tmp/patches
+          bash scripts/generate-patches.sh twemoji-emoji /tmp/patches
+          cd ../upstream
+          git config user.email "twemoji-pipeline@local"
+          git config user.name  "twemoji-pipeline"
+          git am /tmp/patches/*.patch
+      - uses: DeterminateSystems/nix-installer-action@main
+        with: { determinate: true }
+      - name: Build Ghostty (Linux)
+        working-directory: ../upstream
+        run: nix develop -c zig build -Doptimize=ReleaseFast -p ./out
+      - name: Package artifact
+        working-directory: ../upstream
+        run: |
+          mkdir -p ../staging
+          cp out/bin/ghostty ../staging/
+          cd ../staging
+          tar czf ghostty-linux-x86_64.tar.gz ghostty
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-stable
+          path: ../staging/ghostty-linux-x86_64.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  # ===== macOS COLR (Twemoji Mozilla) =====================================
+  build-macos-colr-main:
+    needs: detect-upstream
+    if: needs.detect-upstream.outputs.build_main == 'true'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Fetch upstream main
+        run: |
+          git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
+          git fetch upstream main --depth=1
+      - name: Build workspace at upstream main + patches
+        env:
+          UPSTREAM_SHA: ${{ needs.detect-upstream.outputs.main_full_sha }}
+        run: |
+          git worktree add ../upstream "$UPSTREAM_SHA"
+          mkdir -p /tmp/patches
+          bash scripts/generate-patches.sh twemoji-emoji /tmp/patches
+          cd ../upstream
+          git config user.email "twemoji-pipeline@local"
+          git config user.name  "twemoji-pipeline"
+          git am /tmp/patches/*.patch
+      - uses: DeterminateSystems/nix-installer-action@main
+        with: { determinate: true }
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app
+      - name: Build GhosttyKit (Zig static lib)
+        working-directory: ../upstream
+        run: nix develop -c zig build -Doptimize=ReleaseFast -Demit-macos-app=false
+      - name: Build Ghostty.app
+        working-directory: ../upstream/macos
+        run: xcodebuild -target Ghostty -configuration ReleaseLocal
+      - name: Zip Ghostty.app
+        working-directory: ../upstream/macos/build/ReleaseLocal
+        run: |
+          mkdir -p ${{ github.workspace }}/staging
+          zip -r ${{ github.workspace }}/staging/ghostty-macos-arm64-colr.zip Ghostty.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-colr-main
+          path: staging/ghostty-macos-arm64-colr.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  build-macos-colr-stable:
+    needs: detect-upstream
+    if: needs.detect-upstream.outputs.build_stable == 'true'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Fetch upstream stable branch
+        env:
+          STABLE_BRANCH: ${{ needs.detect-upstream.outputs.stable_branch }}
+        run: |
+          git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
+          git fetch upstream "$STABLE_BRANCH" --depth=1
+      - name: Build workspace at upstream stable + patches
+        env:
+          UPSTREAM_SHA: ${{ needs.detect-upstream.outputs.stable_full_sha }}
+        run: |
+          git worktree add ../upstream "$UPSTREAM_SHA"
+          mkdir -p /tmp/patches
+          bash scripts/generate-patches.sh twemoji-emoji /tmp/patches
+          cd ../upstream
+          git config user.email "twemoji-pipeline@local"
+          git config user.name  "twemoji-pipeline"
+          git am /tmp/patches/*.patch
+      - uses: DeterminateSystems/nix-installer-action@main
+        with: { determinate: true }
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app
+      - name: Build GhosttyKit (Zig static lib)
+        working-directory: ../upstream
+        run: nix develop -c zig build -Doptimize=ReleaseFast -Demit-macos-app=false
+      - name: Build Ghostty.app
+        working-directory: ../upstream/macos
+        run: xcodebuild -target Ghostty -configuration ReleaseLocal
+      - name: Zip Ghostty.app
+        working-directory: ../upstream/macos/build/ReleaseLocal
+        run: |
+          mkdir -p ${{ github.workspace }}/staging
+          zip -r ${{ github.workspace }}/staging/ghostty-macos-arm64-colr.zip Ghostty.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-colr-stable
+          path: staging/ghostty-macos-arm64-colr.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  # ===== macOS sbix (Twemoji-repacked Apple Color Emoji) ==================
+  build-macos-sbix-main:
+    needs: detect-upstream
+    if: needs.detect-upstream.outputs.build_main == 'true'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Fetch upstream main
+        run: |
+          git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
+          git fetch upstream main --depth=1
+      - name: Build workspace at upstream main + patches
+        env:
+          UPSTREAM_SHA: ${{ needs.detect-upstream.outputs.main_full_sha }}
+        run: |
+          git worktree add ../upstream "$UPSTREAM_SHA"
+          mkdir -p /tmp/patches
+          bash scripts/generate-patches.sh twemoji-sbix /tmp/patches
+          cd ../upstream
+          git config user.email "twemoji-pipeline@local"
+          git config user.name  "twemoji-pipeline"
+          git am /tmp/patches/*.patch
+      - uses: DeterminateSystems/nix-installer-action@main
+        with: { determinate: true }
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app
+      - name: Build GhosttyKit (Zig static lib)
+        working-directory: ../upstream
+        run: nix develop -c zig build -Doptimize=ReleaseFast -Demit-macos-app=false
+      - name: Build Ghostty.app
+        working-directory: ../upstream/macos
+        run: xcodebuild -target Ghostty -configuration ReleaseLocal
+      - name: Zip Ghostty.app
+        working-directory: ../upstream/macos/build/ReleaseLocal
+        run: |
+          mkdir -p ${{ github.workspace }}/staging
+          zip -r ${{ github.workspace }}/staging/ghostty-macos-arm64-sbix.zip Ghostty.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-sbix-main
+          path: staging/ghostty-macos-arm64-sbix.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  build-macos-sbix-stable:
+    needs: detect-upstream
+    if: needs.detect-upstream.outputs.build_stable == 'true'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Fetch upstream stable branch
+        env:
+          STABLE_BRANCH: ${{ needs.detect-upstream.outputs.stable_branch }}
+        run: |
+          git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
+          git fetch upstream "$STABLE_BRANCH" --depth=1
+      - name: Build workspace at upstream stable + patches
+        env:
+          UPSTREAM_SHA: ${{ needs.detect-upstream.outputs.stable_full_sha }}
+        run: |
+          git worktree add ../upstream "$UPSTREAM_SHA"
+          mkdir -p /tmp/patches
+          bash scripts/generate-patches.sh twemoji-sbix /tmp/patches
+          cd ../upstream
+          git config user.email "twemoji-pipeline@local"
+          git config user.name  "twemoji-pipeline"
+          git am /tmp/patches/*.patch
+      - uses: DeterminateSystems/nix-installer-action@main
+        with: { determinate: true }
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app
+      - name: Build GhosttyKit (Zig static lib)
+        working-directory: ../upstream
+        run: nix develop -c zig build -Doptimize=ReleaseFast -Demit-macos-app=false
+      - name: Build Ghostty.app
+        working-directory: ../upstream/macos
+        run: xcodebuild -target Ghostty -configuration ReleaseLocal
+      - name: Zip Ghostty.app
+        working-directory: ../upstream/macos/build/ReleaseLocal
+        run: |
+          mkdir -p ${{ github.workspace }}/staging
+          zip -r ${{ github.workspace }}/staging/ghostty-macos-arm64-sbix.zip Ghostty.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-sbix-stable
+          path: staging/ghostty-macos-arm64-sbix.zip
+          if-no-files-found: error
+          retention-days: 1
+
+  # -----------------------------------------------------------------------
+  # release-main: bundles the 3 main artifacts into one GitHub Release
+  # -----------------------------------------------------------------------
+  release-main:
+    needs:
+      - detect-upstream
+      - build-linux-main
+      - build-macos-colr-main
+      - build-macos-sbix-main
+    if: needs.detect-upstream.outputs.build_main == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Compose release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: main-${{ needs.detect-upstream.outputs.today }}-${{ needs.detect-upstream.outputs.main_sha }}
+          UPSTREAM_SHA: ${{ needs.detect-upstream.outputs.main_full_sha }}
+        run: |
+          mkdir -p assets
+          mv dist/linux-main/ghostty-linux-x86_64.tar.gz       assets/
+          mv dist/macos-colr-main/ghostty-macos-arm64-colr.zip assets/
+          mv dist/macos-sbix-main/ghostty-macos-arm64-sbix.zip assets/
+
+          cat > body.md <<EOF
+          # Twemoji build of Ghostty (main)
+
+          Built from upstream \`main\` at [${UPSTREAM_SHA}](https://github.com/${{ env.UPSTREAM_REPO }}/commit/${UPSTREAM_SHA}).
+
+          ## Artifacts
+          | Platform | Variant | File |
+          |---|---|---|
+          | Linux x86_64 | Twemoji CBDT | \`ghostty-linux-x86_64.tar.gz\` |
+          | macOS arm64 | Twemoji Mozilla (COLRv0) | \`ghostty-macos-arm64-colr.zip\` |
+          | macOS arm64 | Twemoji-as-sbix | \`ghostty-macos-arm64-sbix.zip\` |
+
+          > Pre-release: tracks upstream development; expect occasional breakage.
+          EOF
+
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file body.md \
+            --prerelease \
+            --target twemoji-pipeline \
+            assets/*
+
+  # -----------------------------------------------------------------------
+  # release-stable: bundles the 3 stable artifacts into one GitHub Release
+  # -----------------------------------------------------------------------
+  release-stable:
+    needs:
+      - detect-upstream
+      - build-linux-stable
+      - build-macos-colr-stable
+      - build-macos-sbix-stable
+    if: needs.detect-upstream.outputs.build_stable == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Compose release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: stable-${{ needs.detect-upstream.outputs.stable_version }}-${{ needs.detect-upstream.outputs.today }}-${{ needs.detect-upstream.outputs.stable_sha }}
+          UPSTREAM_BRANCH: ${{ needs.detect-upstream.outputs.stable_branch }}
+          UPSTREAM_SHA: ${{ needs.detect-upstream.outputs.stable_full_sha }}
+          VERSION: ${{ needs.detect-upstream.outputs.stable_version }}
+        run: |
+          mkdir -p assets
+          mv dist/linux-stable/ghostty-linux-x86_64.tar.gz       assets/
+          mv dist/macos-colr-stable/ghostty-macos-arm64-colr.zip assets/
+          mv dist/macos-sbix-stable/ghostty-macos-arm64-sbix.zip assets/
+
+          cat > body.md <<EOF
+          # Twemoji build of Ghostty (stable v${VERSION})
+
+          Built from upstream \`${UPSTREAM_BRANCH}\` at [${UPSTREAM_SHA}](https://github.com/${{ env.UPSTREAM_REPO }}/commit/${UPSTREAM_SHA}).
+
+          ## Artifacts
+          | Platform | Variant | File |
+          |---|---|---|
+          | Linux x86_64 | Twemoji CBDT | \`ghostty-linux-x86_64.tar.gz\` |
+          | macOS arm64 | Twemoji Mozilla (COLRv0) | \`ghostty-macos-arm64-colr.zip\` |
+          | macOS arm64 | Twemoji-as-sbix | \`ghostty-macos-arm64-sbix.zip\` |
+          EOF
+
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file body.md \
+            --target twemoji-pipeline \
+            assets/*
+
+  # -----------------------------------------------------------------------
+  # cleanup: keep 5 most recent releases per channel
+  # -----------------------------------------------------------------------
+  cleanup:
+    needs:
+      - release-main
+      - release-stable
+    if: always() && (needs.release-main.result == 'success' || needs.release-stable.result == 'success')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prune old releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/cleanup-releases.sh 5
