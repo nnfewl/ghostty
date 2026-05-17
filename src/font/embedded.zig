@@ -21,8 +21,10 @@ pub const bold_italic = @embedFile("jetbrains_mono_bold_italic");
 /// Emoji fonts
 /// Linux: Twemoji CBDT (replaces embedded NotoColorEmoji)
 pub const emoji = @embedFile("res/NotoColorEmoji.ttf");
-/// macOS: Twemoji Mozilla COLRv0 — CoreText cannot render CBDT bitmaps
-pub const emoji_macos = @embedFile("res/TwemojiMozilla.ttf");
+/// macOS: Twemoji repackaged as sbix (same format as Apple Color Emoji).
+/// Stripped to two strikes (40, 64 ppem) to keep the binary size reasonable.
+/// CoreText handles sbix natively — no COLR workarounds needed.
+pub const emoji_macos = @embedFile("res/AppleColorTwemoji.ttf");
 pub const emoji_text = @embedFile("res/NotoEmoji-Regular.ttf");
 
 // Fonts below are ONLY used for testing.
