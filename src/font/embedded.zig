@@ -19,8 +19,10 @@ pub const italic = @embedFile("jetbrains_mono_italic");
 pub const bold_italic = @embedFile("jetbrains_mono_bold_italic");
 
 /// Emoji fonts
-/// Linux: Twemoji CBDT (replaces embedded NotoColorEmoji)
-pub const emoji = @embedFile("res/NotoColorEmoji.ttf");
+/// Linux: Twemoji CBDT — see res/TwemojiCBDT-LICENSE.txt (CC-BY 4.0).
+/// Upstream's res/NotoColorEmoji.ttf is left untouched so this patch
+/// does not conflict with future upstream font updates.
+pub const emoji = @embedFile("res/TwemojiCBDT.ttf");
 /// macOS: Twemoji Mozilla COLRv0 — CoreText cannot render CBDT bitmaps
 pub const emoji_macos = @embedFile("res/TwemojiMozilla.ttf");
 pub const emoji_text = @embedFile("res/NotoEmoji-Regular.ttf");
