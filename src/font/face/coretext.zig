@@ -304,6 +304,19 @@ pub const Face = struct {
         const is_color = self.isColorGlyph(glyph_index);
         // And whether it's (probably) a bitmap (sbix).
         const sbix = is_color and self.color != null and self.color.?.sbix;
+        // And whether it's a COLR vector color glyph.
+        const colr = is_color and self.color != null and self.color.?.colr;
+
+        // COLR fonts store color in COLR/CPAL tables; the base GLYF entry is
+        // empty, so getBoundingRectsForGlyphs returns a near-zero rect.
+        // Substitute cell dimensions so we don't exit early below.
+        if (colr and (rect.size.width < 0.25 or rect.size.height < 0.25)) {
+            const m = opts.grid_metrics;
+            rect.size.width = @floatFromInt(m.cell_width);
+            rect.size.height = @floatFromInt(m.cell_height);
+            rect.origin.x = 0;
+            rect.origin.y = -@as(f64, @floatFromInt(m.cell_baseline));
+        }
 
         // If we're rendering a synthetic bold then we will gain 50% of
         // the line width on every edge, which means we should increase
