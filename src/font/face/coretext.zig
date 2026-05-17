@@ -308,14 +308,19 @@ pub const Face = struct {
         const colr = is_color and self.color != null and self.color.?.colr;
 
         // COLR fonts store color in COLR/CPAL tables; the base GLYF entry is
-        // empty, so getBoundingRectsForGlyphs returns a near-zero rect.
-        // Substitute cell dimensions so we don't exit early below.
+        // empty, so getBoundingRectsForGlyphs returns a near-zero rect. We
+        // substitute the glyph's natural advance width and the font's natural
+        // ascent/descent so the canvas is large enough to fit the full COLR
+        // composition (otherwise the right side of the glyph draws past the
+        // canvas edge and gets clipped).
         if (colr and (rect.size.width < 0.25 or rect.size.height < 0.25)) {
-            const m = opts.grid_metrics;
-            rect.size.width = @floatFromInt(m.cell_width);
-            rect.size.height = @floatFromInt(m.cell_height);
+            const advance = self.font.getAdvancesForGlyphs(.horizontal, &glyphs, null);
+            const ascent = self.font.getAscent();
+            const descent = self.font.getDescent();
+            rect.size.width = advance;
+            rect.size.height = ascent + descent;
             rect.origin.x = 0;
-            rect.origin.y = -@as(f64, @floatFromInt(m.cell_baseline));
+            rect.origin.y = -descent;
         }
 
         // If we're rendering a synthetic bold then we will gain 50% of
