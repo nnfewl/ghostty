@@ -1,0 +1,33 @@
+Twemoji (CBDT)
+==============
+
+The bundled `TwemojiCBDT.ttf` is the Twemoji color emoji font in
+Google's CBDT/CBLC bitmap format, distributed by the Arch Linux
+`ttf-twemoji-cbdt` package and originally produced from upstream
+Twemoji image assets.
+
+Source project: https://github.com/jdecked/twemoji
+                (formerly https://github.com/twitter/twemoji)
+
+Graphics License
+----------------
+Twemoji graphics (the emoji artwork embedded in this font) are
+licensed under the Creative Commons Attribution 4.0 International
+License (CC-BY 4.0).
+
+  https://creativecommons.org/licenses/by/4.0/
+
+Attribution
+-----------
+Copyright 2020 Twitter, Inc and other contributors.
+
+The current maintained Twemoji project is led by Joen Asmussen
+(jdecked) and other contributors; see the project repository for
+the full contributor list.
+
+Font Code License
+-----------------
+The font's compiled hinting / shaping logic is provided under the
+Apache License 2.0, matching upstream Twemoji's font code.
+
+  https://www.apache.org/licenses/LICENSE-2.0
