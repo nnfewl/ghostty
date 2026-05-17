@@ -2,7 +2,7 @@ name: Build Twemoji
 
 on:
   push:
-    branches: [twemoji-emoji]
+    branches: [twemoji-emoji, twemoji-sbix]
   workflow_dispatch:
 
 concurrency:
