@@ -332,35 +332,21 @@ fn collection(
         },
     );
 
-    // On macOS, always search for and add the Apple Emoji font
-    // as our preferred emoji font for fallback. We do this in case
-    // people add other emoji fonts to their system, we always want to
-    // prefer the official one. Users can override this by explicitly
-    // specifying a font-family for emoji.
-    if (comptime builtin.target.os.tag.isDarwin() and Discover != void) apple_emoji: {
-        const disco = try self.discover() orelse break :apple_emoji;
-        var disco_it = try disco.discover(self.alloc, .{
-            .family = "Apple Color Emoji",
-        });
-        defer disco_it.deinit();
-        if (try disco_it.next()) |face| {
-            _ = try c.addDeferred(self.alloc, face, .{
-                .style = .regular,
-                .fallback = true,
-                // No size adjustment for emojis.
-                .size_adjustment = .none,
-            });
-        }
-    }
-
-    // Emoji fallback. We don't include this on Mac since Mac is expected
-    // to always have the Apple Emoji available on the system.
-    if (comptime !builtin.target.os.tag.isDarwin() or Discover == void) {
+    // Use embedded Twemoji as emoji fallback on all platforms.
+    // Apple Color Emoji is intentionally skipped — the embedded font
+    // already provides full emoji coverage.
+    // macOS uses COLRv0 (CoreText cannot render CBDT bitmaps).
+    // Linux uses CBDT.
+    {
+        const emoji_data = if (comptime builtin.target.os.tag.isDarwin())
+            font.embedded.emoji_macos
+        else
+            font.embedded.emoji;
         _ = try c.add(
             self.alloc,
             try .init(
                 self.font_lib,
-                font.embedded.emoji,
+                emoji_data,
                 load_options.faceOptions(),
             ),
             .{
