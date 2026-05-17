@@ -1,0 +1,80 @@
+name: Build Twemoji
+
+on:
+  push:
+    branches: [twemoji-emoji]
+  workflow_dispatch:
+
+concurrency:
+  group: build-twemoji-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-linux:
+    name: Linux x86_64
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        with:
+          determinate: true
+
+      - name: Build Ghostty
+        run: nix develop -c zig build -Doptimize=ReleaseFast -p ./out
+
+      - name: Verify binary
+        run: |
+          file ./out/bin/ghostty
+          ls -la ./out/bin/
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghostty-linux-x86_64-twemoji
+          path: out/bin/ghostty
+          if-no-files-found: error
+
+  build-macos:
+    name: macOS arm64
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+        with:
+          determinate: true
+
+      # Step 1: Build the Zig static library inside the Nix environment.
+      # This must NOT include the macOS .app build (Nix breaks xcodebuild).
+      - name: Build GhosttyKit (Zig static lib)
+        run: nix develop -c zig build -Doptimize=ReleaseFast -Demit-macos-app=false
+
+      # Step 2: Build the .app with Xcode, outside the Nix environment.
+      # Code signing is disabled — the resulting .app is ad-hoc signed.
+      # To run it locally after download: xattr -dr com.apple.quarantine Ghostty.app
+      - name: Build Ghostty.app
+        run: |
+          cd macos
+          xcodebuild -target Ghostty -configuration Release \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Zip Ghostty.app
+        run: |
+          cd macos/build/Release
+          zip -r ../../../ghostty-macos-arm64-twemoji.zip Ghostty.app
+
+      - name: Upload .app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ghostty-macos-arm64-twemoji
+          path: ghostty-macos-arm64-twemoji.zip
+          if-no-files-found: error
