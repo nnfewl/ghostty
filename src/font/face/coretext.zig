@@ -895,6 +895,11 @@ const ColorState = struct {
     /// We can improve this later.
     sbix: bool,
 
+    /// True if this font has a COLR table (COLRv0/COLRv1 vector color glyphs).
+    /// CTFontDrawGlyphs renders COLR glyphs correctly when given a color
+    /// CGContext, so we just need to make sure is_color = true for these fonts.
+    colr: bool,
+
     /// The SVG font table data (if any), which we can use to determine
     /// if a glyph is present in the SVG table.
     svg: ?opentype.SVG,
@@ -911,6 +916,14 @@ const ColorState = struct {
             const data = f.copyTable(tag) orelse break :sbix false;
             data.release();
             break :sbix data.getLength() > 0;
+        };
+
+        // COLR table: COLRv0/COLRv1 vector color glyphs.
+        const colr: bool = colr: {
+            const tag = macos.text.FontTableTag.init("COLR");
+            const data = f.copyTable(tag) orelse break :colr false;
+            data.release();
+            break :colr data.getLength() > 0;
         };
 
         // Read the SVG table out of the font data.
@@ -940,6 +953,7 @@ const ColorState = struct {
 
         return .{
             .sbix = sbix,
+            .colr = colr,
             .svg = if (svg) |v| v.svg else null,
             .svg_data = if (svg) |v| v.data else null,
         };
@@ -958,6 +972,10 @@ const ColorState = struct {
 
         // sbix is always true for now
         if (self.sbix) return true;
+
+        // COLR/CPAL vector color glyphs — CTFontDrawGlyphs renders these
+        // correctly when given a color CGContext.
+        if (self.colr) return true;
 
         // if we have svg data, check it
         if (self.svg) |svg| {
