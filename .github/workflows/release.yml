@@ -47,6 +47,37 @@ jobs:
           echo "| stable (\`${{ steps.detect.outputs.stable_branch }}\` @ v${{ steps.detect.outputs.stable_version }}) | \`${{ steps.detect.outputs.stable_sha }}\` | ${{ steps.detect.outputs.build_stable }} |" >> "$GITHUB_STEP_SUMMARY"
 
   # -----------------------------------------------------------------------
+  # sync-fork: fast-forward our fork's mirror branches (main + current
+  # stable X.Y.x) to match upstream HEAD. Pure mirror — we never commit
+  # to these branches, so there's never a conflict.
+  # -----------------------------------------------------------------------
+  sync-fork:
+    needs: detect-upstream
+    if: needs.detect-upstream.outputs.build_main == 'true' || needs.detect-upstream.outputs.build_stable == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Use the workflow's GITHUB_TOKEN so we can push back.
+          token: ${{ github.token }}
+      - name: Fast-forward mirror branches
+        env:
+          STABLE_BRANCH: ${{ needs.detect-upstream.outputs.stable_branch }}
+        run: |
+          git config user.email "twemoji-pipeline@local"
+          git config user.name  "twemoji-pipeline"
+          git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
+          git fetch upstream main "$STABLE_BRANCH"
+          # Force-push fast-forwards (no conflict possible since these
+          # branches are pure mirrors; --force-with-lease would refuse
+          # if anyone manually modified them).
+          git push origin \
+            "refs/remotes/upstream/main:refs/heads/main" \
+            "refs/remotes/upstream/${STABLE_BRANCH}:refs/heads/${STABLE_BRANCH}" \
+            --force
+
+  # -----------------------------------------------------------------------
   # Reusable composite logic via job templates would be nicer here, but
   # GitHub Actions doesn't support `uses:` for embedded jobs without
   # creating separate workflow files. We accept the repetition.
