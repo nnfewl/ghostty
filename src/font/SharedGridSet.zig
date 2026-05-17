@@ -333,6 +333,47 @@ fn collection(
         },
     );
 
+    // Prefer the embedded Twemoji face over the system emoji font on
+    // macOS. Fallback order is priority order -- Collection.getIndex
+    // returns the first face that has the codepoint -- so inserting
+    // ahead of upstream's Apple Color Emoji discovery is enough to win,
+    // and lets that block stay untouched. Deleting it instead is what
+    // made this patch conflict every time upstream edited it.
+    //
+    // Nothing is needed here for Linux: upstream's own emoji fallback
+    // below loads font.embedded.emoji, which embedded.zig already points
+    // at the Twemoji build.
+    if (comptime builtin.target.os.tag.isDarwin()) {
+        _ = try c.add(
+            self.alloc,
+            try .init(
+                self.font_lib,
+                font.embedded.emoji_macos,
+                load_options.faceOptions(),
+            ),
+            .{
+                .style = .regular,
+                .fallback = true,
+                // No size adjustment for emojis.
+                .size_adjustment = .none,
+            },
+        );
+        _ = try c.add(
+            self.alloc,
+            try .init(
+                self.font_lib,
+                font.embedded.emoji_text,
+                load_options.faceOptions(),
+            ),
+            .{
+                .style = .regular,
+                .fallback = true,
+                // No size adjustment for emojis.
+                .size_adjustment = .none,
+            },
+        );
+    }
+
     // On macOS, always search for and add the Apple Emoji font
     // as our preferred emoji font for fallback. We do this in case
     // people add other emoji fonts to their system, we always want to
