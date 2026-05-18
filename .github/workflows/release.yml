@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write   # gh release create/delete + tag push
+  id-token: write   # Determinate Systems cache authentication
 
 concurrency:
   group: release
@@ -121,6 +122,7 @@ jobs:
           git am /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
         with: { determinate: true }
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - name: Build Ghostty (Linux)
         working-directory: ../upstream
         run: nix develop -c zig build -Doptimize=ReleaseFast -p ./out
@@ -164,6 +166,7 @@ jobs:
           git am /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
         with: { determinate: true }
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - name: Build Ghostty (Linux)
         working-directory: ../upstream
         run: nix develop -c zig build -Doptimize=ReleaseFast -p ./out
@@ -206,6 +209,7 @@ jobs:
           git am /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
         with: { determinate: true }
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.2.app
       - name: Build GhosttyKit (Zig static lib)
@@ -252,6 +256,7 @@ jobs:
           git am /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
         with: { determinate: true }
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.2.app
       - name: Build GhosttyKit (Zig static lib)
@@ -297,6 +302,7 @@ jobs:
           git am /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
         with: { determinate: true }
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.2.app
       - name: Build GhosttyKit (Zig static lib)
@@ -343,6 +349,7 @@ jobs:
           git am /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
         with: { determinate: true }
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.2.app
       - name: Build GhosttyKit (Zig static lib)
