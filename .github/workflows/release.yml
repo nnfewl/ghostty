@@ -104,7 +104,7 @@ jobs:
       - name: Fetch upstream main
         run: |
           git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
-          git fetch upstream main --depth=1
+          git fetch upstream main
       - name: Build workspace at upstream main + patches
         env:
           UPSTREAM_SHA: ${{ needs.detect-upstream.outputs.main_full_sha }}
@@ -150,7 +150,7 @@ jobs:
           STABLE_BRANCH: ${{ needs.detect-upstream.outputs.stable_branch }}
         run: |
           git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
-          git fetch upstream "$STABLE_BRANCH" --depth=1
+          git fetch upstream "$STABLE_BRANCH"
       - name: Build workspace at upstream stable + patches
         env:
           UPSTREAM_SHA: ${{ needs.detect-upstream.outputs.stable_full_sha }}
@@ -192,7 +192,7 @@ jobs:
       - name: Fetch upstream main
         run: |
           git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
-          git fetch upstream main --depth=1
+          git fetch upstream main
       - name: Build workspace at upstream main + patches
         env:
           UPSTREAM_SHA: ${{ needs.detect-upstream.outputs.main_full_sha }}
@@ -238,7 +238,7 @@ jobs:
           STABLE_BRANCH: ${{ needs.detect-upstream.outputs.stable_branch }}
         run: |
           git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
-          git fetch upstream "$STABLE_BRANCH" --depth=1
+          git fetch upstream "$STABLE_BRANCH"
       - name: Build workspace at upstream stable + patches
         env:
           UPSTREAM_SHA: ${{ needs.detect-upstream.outputs.stable_full_sha }}
@@ -283,7 +283,7 @@ jobs:
       - name: Fetch upstream main
         run: |
           git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
-          git fetch upstream main --depth=1
+          git fetch upstream main
       - name: Build workspace at upstream main + patches
         env:
           UPSTREAM_SHA: ${{ needs.detect-upstream.outputs.main_full_sha }}
@@ -329,7 +329,7 @@ jobs:
           STABLE_BRANCH: ${{ needs.detect-upstream.outputs.stable_branch }}
         run: |
           git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
-          git fetch upstream "$STABLE_BRANCH" --depth=1
+          git fetch upstream "$STABLE_BRANCH"
       - name: Build workspace at upstream stable + patches
         env:
           UPSTREAM_SHA: ${{ needs.detect-upstream.outputs.stable_full_sha }}
