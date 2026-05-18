@@ -2,12 +2,11 @@ name: Release Twemoji builds
 
 on:
   schedule:
-    - cron: '0 */6 * * *'   # every 6 hours
+    - cron: '0 0 * * *'   # nightly at 00:00 UTC
   workflow_dispatch: {}
 
 permissions:
   contents: write   # gh release create/delete + tag push
-  id-token: write   # Determinate Systems cache authentication
 
 concurrency:
   group: release
@@ -121,8 +120,9 @@ jobs:
           git config user.name  "twemoji-pipeline"
           git am /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
-        with: { determinate: true }
+        with: { determinate: false }
       - uses: DeterminateSystems/magic-nix-cache-action@v13
+        with: { use-flakehub: disabled, use-gha-cache: enabled }
       - name: Build Ghostty (Linux)
         working-directory: ../upstream
         run: nix develop -c zig build -Doptimize=ReleaseFast -p ./out
@@ -165,8 +165,9 @@ jobs:
           git config user.name  "twemoji-pipeline"
           git am /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
-        with: { determinate: true }
+        with: { determinate: false }
       - uses: DeterminateSystems/magic-nix-cache-action@v13
+        with: { use-flakehub: disabled, use-gha-cache: enabled }
       - name: Build Ghostty (Linux)
         working-directory: ../upstream
         run: nix develop -c zig build -Doptimize=ReleaseFast -p ./out
@@ -208,8 +209,9 @@ jobs:
           git config user.name  "twemoji-pipeline"
           git am /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
-        with: { determinate: true }
+        with: { determinate: false }
       - uses: DeterminateSystems/magic-nix-cache-action@v13
+        with: { use-flakehub: disabled, use-gha-cache: enabled }
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.2.app
       - name: Build GhosttyKit (Zig static lib)
@@ -255,8 +257,9 @@ jobs:
           git config user.name  "twemoji-pipeline"
           git am /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
-        with: { determinate: true }
+        with: { determinate: false }
       - uses: DeterminateSystems/magic-nix-cache-action@v13
+        with: { use-flakehub: disabled, use-gha-cache: enabled }
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.2.app
       - name: Build GhosttyKit (Zig static lib)
@@ -301,8 +304,9 @@ jobs:
           git config user.name  "twemoji-pipeline"
           git am /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
-        with: { determinate: true }
+        with: { determinate: false }
       - uses: DeterminateSystems/magic-nix-cache-action@v13
+        with: { use-flakehub: disabled, use-gha-cache: enabled }
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.2.app
       - name: Build GhosttyKit (Zig static lib)
@@ -348,8 +352,9 @@ jobs:
           git config user.name  "twemoji-pipeline"
           git am /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
-        with: { determinate: true }
+        with: { determinate: false }
       - uses: DeterminateSystems/magic-nix-cache-action@v13
+        with: { use-flakehub: disabled, use-gha-cache: enabled }
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.2.app
       - name: Build GhosttyKit (Zig static lib)
