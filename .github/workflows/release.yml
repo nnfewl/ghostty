@@ -102,7 +102,8 @@ jobs:
           STABLE_BRANCH: ${{ needs.detect-upstream.outputs.stable_branch }}
         run: |
           git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
-          git fetch upstream main "$STABLE_BRANCH" --tags
+          git fetch upstream main "$STABLE_BRANCH"
+          git fetch upstream tag "v${{ needs.detect-upstream.outputs.stable_version }}" --no-tags
       - name: Rebase dev branches
         id: rebase
         env:
