@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write   # gh release create/delete + tag push
+  issues: write     # rebase failure notifications
 
 concurrency:
   group: release
@@ -78,6 +79,38 @@ jobs:
             --force
 
   # -----------------------------------------------------------------------
+  # rebase-dev-branches: rebase the 4 dev branches onto their channel
+  # targets (stable tag or upstream main) and force-push. Build jobs
+  # depend on this and check per-branch success flags.
+  # -----------------------------------------------------------------------
+  rebase-dev-branches:
+    needs: [detect-upstream, sync-fork]
+    if: needs.detect-upstream.outputs.build_main == 'true' || needs.detect-upstream.outputs.build_stable == 'true'
+    runs-on: ubuntu-24.04
+    outputs:
+      emoji_stable_ok: ${{ steps.rebase.outputs.emoji_stable_ok }}
+      emoji_main_ok:   ${{ steps.rebase.outputs.emoji_main_ok }}
+      sbix_stable_ok:  ${{ steps.rebase.outputs.sbix_stable_ok }}
+      sbix_main_ok:    ${{ steps.rebase.outputs.sbix_main_ok }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ github.token }}
+      - name: Fetch upstream
+        env:
+          STABLE_BRANCH: ${{ needs.detect-upstream.outputs.stable_branch }}
+        run: |
+          git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
+          git fetch upstream main "$STABLE_BRANCH" --tags
+      - name: Rebase dev branches
+        id: rebase
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STABLE_VERSION: ${{ needs.detect-upstream.outputs.stable_version }}
+        run: bash scripts/rebase-dev-branches.sh "$STABLE_VERSION"
+
+  # -----------------------------------------------------------------------
   # Reusable composite logic via job templates would be nicer here, but
   # GitHub Actions doesn't support `uses:` for embedded jobs without
   # creating separate workflow files. We accept the repetition.
@@ -93,8 +126,8 @@ jobs:
 
   # ===== Linux (CBDT Twemoji) =============================================
   build-linux-main:
-    needs: detect-upstream
-    if: needs.detect-upstream.outputs.build_main == 'true'
+    needs: [detect-upstream, rebase-dev-branches]
+    if: needs.detect-upstream.outputs.build_main == 'true' && needs.rebase-dev-branches.outputs.emoji_main_ok == 'true'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout our fork
@@ -113,12 +146,12 @@ jobs:
           git worktree add ../upstream "$UPSTREAM_SHA"
           # Generate our patches against upstream main (where dev branch was based)
           mkdir -p /tmp/patches
-          bash scripts/generate-patches.sh twemoji-emoji /tmp/patches
+          bash scripts/generate-patches.sh twemoji-emoji-main origin/main /tmp/patches
           # Apply patches inside the worktree
           cd ../upstream
           git config user.email "twemoji-pipeline@local"
           git config user.name  "twemoji-pipeline"
-          git am /tmp/patches/*.patch
+          git am --3way /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
         with: { determinate: false }
       - uses: DeterminateSystems/magic-nix-cache-action@v13
@@ -141,8 +174,8 @@ jobs:
           retention-days: 1
 
   build-linux-stable:
-    needs: detect-upstream
-    if: needs.detect-upstream.outputs.build_stable == 'true'
+    needs: [detect-upstream, rebase-dev-branches]
+    if: needs.detect-upstream.outputs.build_stable == 'true' && needs.rebase-dev-branches.outputs.emoji_stable_ok == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
@@ -159,11 +192,11 @@ jobs:
         run: |
           git worktree add ../upstream "$UPSTREAM_SHA"
           mkdir -p /tmp/patches
-          bash scripts/generate-patches.sh twemoji-emoji /tmp/patches
+          bash scripts/generate-patches.sh twemoji-emoji-stable "v${{ needs.detect-upstream.outputs.stable_version }}" /tmp/patches
           cd ../upstream
           git config user.email "twemoji-pipeline@local"
           git config user.name  "twemoji-pipeline"
-          git am /tmp/patches/*.patch
+          git am --3way /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
         with: { determinate: false }
       - uses: DeterminateSystems/magic-nix-cache-action@v13
@@ -187,8 +220,8 @@ jobs:
 
   # ===== macOS COLR (Twemoji Mozilla) =====================================
   build-macos-colr-main:
-    needs: detect-upstream
-    if: needs.detect-upstream.outputs.build_main == 'true'
+    needs: [detect-upstream, rebase-dev-branches]
+    if: needs.detect-upstream.outputs.build_main == 'true' && needs.rebase-dev-branches.outputs.emoji_main_ok == 'true'
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
@@ -203,11 +236,11 @@ jobs:
         run: |
           git worktree add ../upstream "$UPSTREAM_SHA"
           mkdir -p /tmp/patches
-          bash scripts/generate-patches.sh twemoji-emoji /tmp/patches
+          bash scripts/generate-patches.sh twemoji-emoji-main origin/main /tmp/patches
           cd ../upstream
           git config user.email "twemoji-pipeline@local"
           git config user.name  "twemoji-pipeline"
-          git am /tmp/patches/*.patch
+          git am --3way /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
         with: { determinate: false }
       - uses: DeterminateSystems/magic-nix-cache-action@v13
@@ -233,8 +266,8 @@ jobs:
           retention-days: 1
 
   build-macos-colr-stable:
-    needs: detect-upstream
-    if: needs.detect-upstream.outputs.build_stable == 'true'
+    needs: [detect-upstream, rebase-dev-branches]
+    if: needs.detect-upstream.outputs.build_stable == 'true' && needs.rebase-dev-branches.outputs.emoji_stable_ok == 'true'
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
@@ -251,11 +284,11 @@ jobs:
         run: |
           git worktree add ../upstream "$UPSTREAM_SHA"
           mkdir -p /tmp/patches
-          bash scripts/generate-patches.sh twemoji-emoji /tmp/patches
+          bash scripts/generate-patches.sh twemoji-emoji-stable "v${{ needs.detect-upstream.outputs.stable_version }}" /tmp/patches
           cd ../upstream
           git config user.email "twemoji-pipeline@local"
           git config user.name  "twemoji-pipeline"
-          git am /tmp/patches/*.patch
+          git am --3way /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
         with: { determinate: false }
       - uses: DeterminateSystems/magic-nix-cache-action@v13
@@ -282,8 +315,8 @@ jobs:
 
   # ===== macOS sbix (Twemoji-repacked Apple Color Emoji) ==================
   build-macos-sbix-main:
-    needs: detect-upstream
-    if: needs.detect-upstream.outputs.build_main == 'true'
+    needs: [detect-upstream, rebase-dev-branches]
+    if: needs.detect-upstream.outputs.build_main == 'true' && needs.rebase-dev-branches.outputs.sbix_main_ok == 'true'
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
@@ -298,11 +331,11 @@ jobs:
         run: |
           git worktree add ../upstream "$UPSTREAM_SHA"
           mkdir -p /tmp/patches
-          bash scripts/generate-patches.sh twemoji-sbix /tmp/patches
+          bash scripts/generate-patches.sh twemoji-sbix-main origin/main /tmp/patches
           cd ../upstream
           git config user.email "twemoji-pipeline@local"
           git config user.name  "twemoji-pipeline"
-          git am /tmp/patches/*.patch
+          git am --3way /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
         with: { determinate: false }
       - uses: DeterminateSystems/magic-nix-cache-action@v13
@@ -328,8 +361,8 @@ jobs:
           retention-days: 1
 
   build-macos-sbix-stable:
-    needs: detect-upstream
-    if: needs.detect-upstream.outputs.build_stable == 'true'
+    needs: [detect-upstream, rebase-dev-branches]
+    if: needs.detect-upstream.outputs.build_stable == 'true' && needs.rebase-dev-branches.outputs.sbix_stable_ok == 'true'
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
@@ -346,11 +379,11 @@ jobs:
         run: |
           git worktree add ../upstream "$UPSTREAM_SHA"
           mkdir -p /tmp/patches
-          bash scripts/generate-patches.sh twemoji-sbix /tmp/patches
+          bash scripts/generate-patches.sh twemoji-sbix-stable "v${{ needs.detect-upstream.outputs.stable_version }}" /tmp/patches
           cd ../upstream
           git config user.email "twemoji-pipeline@local"
           git config user.name  "twemoji-pipeline"
-          git am /tmp/patches/*.patch
+          git am --3way /tmp/patches/*.patch
       - uses: DeterminateSystems/nix-installer-action@main
         with: { determinate: false }
       - uses: DeterminateSystems/magic-nix-cache-action@v13
