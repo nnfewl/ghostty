@@ -6,8 +6,9 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write   # gh release create/delete + tag push
-  issues: write     # rebase failure notifications
+  contents: write    # gh release create/delete + tag push
+  issues: write      # rebase failure notifications
+  workflows: write   # sync-fork pushes upstream workflow file changes
 
 concurrency:
   group: release
