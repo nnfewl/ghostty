@@ -6,9 +6,8 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write    # gh release create/delete + tag push
-  issues: write      # rebase failure notifications
-  workflows: write   # sync-fork pushes upstream workflow file changes
+  contents: write   # gh release create/delete + tag push
+  issues: write     # rebase failure notifications
 
 concurrency:
   group: release
@@ -61,8 +60,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          # Use the workflow's GITHUB_TOKEN so we can push back.
-          token: ${{ github.token }}
+          token: ${{ secrets.SYNC_TOKEN }}
       - name: Fast-forward mirror branches
         env:
           STABLE_BRANCH: ${{ needs.detect-upstream.outputs.stable_branch }}
