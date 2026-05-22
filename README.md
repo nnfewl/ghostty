@@ -3,6 +3,12 @@
 Automated builds of [Ghostty](https://github.com/ghostty-org/ghostty) with the
 default Noto Color Emoji replaced by Twemoji.
 
+![Ghostty with Twemoji glyphs in the prompt](ghostty-twemoji.png)
+
+The screenshot shows Ghostty rendering Twemoji-style emoji directly in the
+shell prompt and command output — same flat, friendly style across macOS and
+Linux instead of the platform default.
+
 This branch (`twemoji-pipeline`) is the default branch of this fork; it holds
 only the CI pipeline. The actual patches live on:
 
