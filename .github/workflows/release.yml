@@ -95,14 +95,13 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          token: ${{ github.token }}
+          token: ${{ secrets.SYNC_TOKEN }}
       - name: Fetch upstream
         env:
           STABLE_BRANCH: ${{ needs.detect-upstream.outputs.stable_branch }}
         run: |
           git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
-          git fetch upstream main "$STABLE_BRANCH"
-          git fetch upstream tag "v${{ needs.detect-upstream.outputs.stable_version }}" --no-tags
+          git fetch --no-tags upstream main "$STABLE_BRANCH" "refs/tags/v${{ needs.detect-upstream.outputs.stable_version }}:refs/tags/v${{ needs.detect-upstream.outputs.stable_version }}"
       - name: Rebase dev branches
         id: rebase
         env:
