@@ -9,7 +9,7 @@
 #   rebase-dev-branches.sh <stable-version>
 #
 # Expects:
-#   - upstream remote already added and fetched (main + stable branch)
+#   - origin has been synced with upstream (main + stable branch + stable tag)
 #   - origin remote has the dev branches
 #   - GH_TOKEN set for gh CLI (issue creation)
 #   - GITHUB_OUTPUT set (CI) or defaults to stdout
@@ -22,9 +22,9 @@ OUTPUT_FILE="${GITHUB_OUTPUT:-/dev/stdout}"
 
 BRANCHES=(
   "twemoji-emoji-stable:$STABLE_TAG"
-  "twemoji-emoji-main:upstream/main"
+  "twemoji-emoji-main:origin/main"
   "twemoji-sbix-stable:$STABLE_TAG"
-  "twemoji-sbix-main:upstream/main"
+  "twemoji-sbix-main:origin/main"
 )
 
 open_or_comment_issue() {
