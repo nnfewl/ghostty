@@ -153,6 +153,12 @@ jobs:
         with: { determinate: false }
       - uses: DeterminateSystems/magic-nix-cache-action@v13
         with: { use-flakehub: disabled, use-gha-cache: enabled }
+      - name: Fetch Zig dependencies (retried)
+        working-directory: ../upstream
+        # Best-effort: warms the dependency cache so the flaky git+https
+        # fetches are retried here instead of killing the build below.
+        continue-on-error: true
+        run: bash ${{ github.workspace }}/scripts/zig-fetch-retry.sh
       - name: Build Ghostty (Linux)
         working-directory: ../upstream
         run: nix develop -c zig build -Doptimize=ReleaseFast -p ./out
@@ -192,6 +198,12 @@ jobs:
         with: { determinate: false }
       - uses: DeterminateSystems/magic-nix-cache-action@v13
         with: { use-flakehub: disabled, use-gha-cache: enabled }
+      - name: Fetch Zig dependencies (retried)
+        working-directory: ../upstream
+        # Best-effort: warms the dependency cache so the flaky git+https
+        # fetches are retried here instead of killing the build below.
+        continue-on-error: true
+        run: bash ${{ github.workspace }}/scripts/zig-fetch-retry.sh
       - name: Build Ghostty (Linux)
         working-directory: ../upstream
         run: nix develop -c zig build -Doptimize=ReleaseFast -p ./out
@@ -234,6 +246,12 @@ jobs:
         with: { use-flakehub: disabled, use-gha-cache: enabled }
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.2.app
+      - name: Fetch Zig dependencies (retried)
+        working-directory: ../upstream
+        # Best-effort: warms the dependency cache so the flaky git+https
+        # fetches are retried here instead of killing the build below.
+        continue-on-error: true
+        run: bash ${{ github.workspace }}/scripts/zig-fetch-retry.sh
       - name: Build GhosttyKit (Zig static lib)
         working-directory: ../upstream
         run: nix develop -c zig build -Doptimize=ReleaseFast -Demit-macos-app=false
@@ -276,6 +294,12 @@ jobs:
         with: { use-flakehub: disabled, use-gha-cache: enabled }
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.2.app
+      - name: Fetch Zig dependencies (retried)
+        working-directory: ../upstream
+        # Best-effort: warms the dependency cache so the flaky git+https
+        # fetches are retried here instead of killing the build below.
+        continue-on-error: true
+        run: bash ${{ github.workspace }}/scripts/zig-fetch-retry.sh
       - name: Build GhosttyKit (Zig static lib)
         working-directory: ../upstream
         run: nix develop -c zig build -Doptimize=ReleaseFast -Demit-macos-app=false
@@ -319,6 +343,12 @@ jobs:
         with: { use-flakehub: disabled, use-gha-cache: enabled }
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.2.app
+      - name: Fetch Zig dependencies (retried)
+        working-directory: ../upstream
+        # Best-effort: warms the dependency cache so the flaky git+https
+        # fetches are retried here instead of killing the build below.
+        continue-on-error: true
+        run: bash ${{ github.workspace }}/scripts/zig-fetch-retry.sh
       - name: Build GhosttyKit (Zig static lib)
         working-directory: ../upstream
         run: nix develop -c zig build -Doptimize=ReleaseFast -Demit-macos-app=false
@@ -361,6 +391,12 @@ jobs:
         with: { use-flakehub: disabled, use-gha-cache: enabled }
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.2.app
+      - name: Fetch Zig dependencies (retried)
+        working-directory: ../upstream
+        # Best-effort: warms the dependency cache so the flaky git+https
+        # fetches are retried here instead of killing the build below.
+        continue-on-error: true
+        run: bash ${{ github.workspace }}/scripts/zig-fetch-retry.sh
       - name: Build GhosttyKit (Zig static lib)
         working-directory: ../upstream
         run: nix develop -c zig build -Doptimize=ReleaseFast -Demit-macos-app=false
